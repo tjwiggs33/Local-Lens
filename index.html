@@ -3,297 +3,126 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Local Lens — Live Map</title>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
+  <title>Local Lens – Live Map</title>
+  
+  <!-- Leaflet map -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+
+  <!-- Supabase -->
   <script src="https://unpkg.com/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+
   <style>
-    :root { --bg:#0b0f14; --card:#121823; --muted:#a3b1c2; }
-    html, body { height: 100%; margin: 0; font-family: -apple-system, system-ui, Segoe UI, Roboto, Helvetica, Arial; background: var(--bg); color: white;}
-    .wrap { padding: 14px; max-width: 1100px; margin: 0 auto; }
-    h2 { margin: 8px 0 12px; }
-    #map { height: 54vh; border-radius: 12px; overflow: hidden; }
-    .status { padding: 10px 12px; border-radius: 10px; background: var(--card); margin: 10px 0; color: var(--muted); }
-    .grid { display: grid; grid-template-columns: 1fr; gap: 12px; }
-    @media(min-width: 900px){ .grid{ grid-template-columns: 1.2fr 0.8fr; } }
-    .card { background: var(--card); border: 1px solid #222a35; border-radius: 12px; padding: 12px; }
-    label { display:block; margin-top: 8px; font-size: 14px; color: var(--muted); }
-    input, select, textarea { width: 100%; padding: 10px; border: 1px solid #2a3442; background: #0e141c; color: white; border-radius: 10px; }
-    button { padding: 12px 14px; border: 0; border-radius: 10px; background: #1f6feb; color: white; font-weight: 700; margin-top: 10px; width: 100%; }
-    .list { margin-top: 10px; }
-    .item { padding: 10px 10px; border-bottom: 1px solid #1f2733; display: flex; justify-content: space-between; gap: 10px; align-items:center; }
-    .left { display:flex; flex-direction: column; }
-    .badge { font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: #263144; color: #d7e3f7; display: inline-block; margin-bottom: 6px; }
-    .type-Deal { background: #2b3e26; color: #d6f7d7; }
-    .type-Traffic { background: #3a2433; color: #ffd6e5; }
-    .type-Crowd { background: #2b2b3e; color: #d6d6f7; }
-    .type-Safety { background: #3e2b2b; color: #f7d6d6; }
-    .pop { color: var(--muted); font-size: 12px; }
-    .toolbar { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin:8px 0 4px; }
-    .pill { background:#243043; border:1px solid #2f3b4e; border-radius:999px; padding:8px 12px; cursor:pointer; }
-    .pill.active { background:#31507b; }
-    .row { display:flex; align-items:center; gap:10px; }
-    input[type=range]{ width:260px; }
-    a.brand { color:#cde3ff; text-decoration:none; font-weight:700; }
-    .likeBtn { background:#2e7d32; padding:8px 10px; border-radius:999px; cursor:pointer; border:0; color:white; font-weight:700; }
-    .bar { display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:8px;}
-    .small { font-size:12px; color:var(--muted); }
-    .hint { font-size:12px; color:var(--muted); margin-top:6px; }
+    :root {
+      --bg: #0b0f14;
+      --card: #121823;
+      --accent: #4a90e2;
+    }
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: var(--bg);
+      color: #fff;
+    }
+    h2 {
+      margin: 12px;
+    }
+    #map {
+      height: 55vh;
+    }
+    .controls, .post {
+      background: var(--card);
+      padding: 12px;
+      margin: 10px;
+      border-radius: 6px;
+    }
+    button {
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      padding: 8px 12px;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    input, select, textarea {
+      width: 100%;
+      padding: 8px;
+      margin: 6px 0;
+      border-radius: 4px;
+      border: none;
+    }
   </style>
 </head>
 <body>
-  <div class="wrap">
-    <div class="bar">
-      <div><a class="brand">Local Lens</a></div>
-      <div class="row small">
-        <div id="clock"></div>
-        <button id="export" class="pill">Export CSV</button>
-      </div>
-    </div>
-    <div class="status" id="status">Loading…</div>
-    <div id="map"></div>
+  <h2>Local Lens</h2>
+  <div id="map"></div>
 
-    <div class="toolbar">
-      <div class="pop">Radius</div>
-      <input type="range" id="radius" min="1" max="20" value="8"/>
-      <div class="pop"><span id="radiusLabel">8</span> mi</div>
-      <div class="pill active" data-type="All">All</div>
-      <div class="pill" data-type="Traffic">Traffic</div>
-      <div class="pill" data-type="Crowd">Crowd</div>
-      <div class="pill" data-type="Deal">Deals</div>
-      <div class="pill" data-type="Safety">Safety</div>
-    </div>
-
-    <div class="grid">
-      <div class="card">
-        <h3>Post an alert</h3>
-        <label>Type</label>
-        <select id="type">
-          <option>Traffic</option>
-          <option>Crowd</option>
-          <option>Safety</option>
-          <option>Deal</option>
-        </select>
-        <label>Notes</label>
-        <textarea id="notes" rows="3" maxlength="180" placeholder="Short description (≤ 180 chars)"></textarea>
-        <button id="post">Post alert at map center</button>
-        <div class="hint">Cooldown: 30 seconds between posts (per device).</div>
-      </div>
-
-      <div class="card">
-        <h3>Popular alerts nearby</h3>
-        <div class="list" id="feed"></div>
-      </div>
-    </div>
+  <div class="controls">
+    <button onclick="loadAlerts()">Refresh Alerts</button>
+    <div id="alerts"></div>
   </div>
 
-<script>
-const SUPABASE_URL  = "https://cpoehiouyljletdplikv.supabase.co";
-const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNwb2VoaW91eWxqbGV0ZHBsaWt2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg3Mjc4MzgsImV4cCI6MjA3NDMwMzgzOH0.0kapsPz1bsrIXlzwWzbIPfqnzBjdApIgdCgXNoNwDng";
+  <div class="post">
+    <h3>Post an alert</h3>
+    <label>Type</label>
+    <select id="alertType">
+      <option value="Traffic">Traffic</option>
+      <option value="Crowd">Crowd</option>
+      <option value="Deals">Deals</option>
+      <option value="Safety">Safety</option>
+      <option value="Event">Event</option>
+    </select>
+    <label>Notes</label>
+    <textarea id="alertNotes" rows="3"></textarea>
+    <button onclick="postAlert()">Submit</button>
+  </div>
 
-const BAD_WORDS = ["fuck","shit","bitch","asshole","dick","cunt"];
+  <script>
+    // --- Supabase setup ---
+    const supabaseUrl = "https://cpoehiouyljletdplikv.supabase.co";
+    const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNwb2VoaW91eWxqbGV0ZHBsaWt2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg3Mjc4MzgsImV4cCI6MjA3NDMwMzgzOH0.0kapsPz1bsrIXlzwWzbIPfqnzBjdApIgdCgXNoNwDng";
+    const _supabase = supabase.createClient(supabaseUrl, supabaseKey);
 
-const statusEl = document.getElementById('status');
-const radiusEl = document.getElementById('radius');
-const radiusLabel = document.getElementById('radiusLabel');
-const feedEl = document.getElementById('feed');
-const exportBtn = document.getElementById('export');
-let map, centerMarker, markers=[], cacheAlerts=[];
-
-function log(msg){ statusEl.textContent = msg; }
-radiusEl.addEventListener('input', ()=> { radiusLabel.textContent = radiusEl.value; refresh(); });
-
-function haversineMiles(a, b){
-  const toRad = (d)=> d * Math.PI/180;
-  const R = 3958.8;
-  const dLat = toRad(b.lat - a.lat);
-  const dLng = toRad(b.lng - a.lng);
-  const lat1 = toRad(a.lat);
-  const lat2 = toRad(b.lat);
-  const h = Math.sin(dLat/2)**2 + Math.cos(lat1)*Math.cos(lat2)*Math.sin(dLng/2)**2;
-  return 2*R*Math.asin(Math.sqrt(h));
-}
-
-function initMap(lat, lng){
-  if (!map){
-    map = L.map('map', { zoomControl: true });
+    // --- Leaflet map ---
+    const map = L.map('map').setView([39.5359, -76.3483], 12); // Center near Bel Air
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 19, attribution: '&copy; OpenStreetMap'
+      maxZoom: 19
     }).addTo(map);
-    map.on('moveend', ()=>{ const c = map.getCenter(); if (centerMarker){ centerMarker.setLatLng(c); } refresh(); });
-  }
-  const c = [lat, lng];
-  map.setView(c, 13.5);
-  if (!centerMarker){ centerMarker = L.marker(c).addTo(map).bindPopup('Map center'); }
-  else { centerMarker.setLatLng(c); }
-}
 
-function clearMarkers(){ markers.forEach(m => m.remove()); markers = []; }
+    // --- Load alerts from Supabase ---
+    async function loadAlerts() {
+      document.getElementById("alerts").innerHTML = "Loading...";
+      const { data, error } = await _supabase.from("alerts").select("*").order("created_at", { ascending: false }).limit(10);
+      if (error) {
+        document.getElementById("alerts").innerHTML = "Error loading alerts.";
+        console.error(error);
+        return;
+      }
+      if (data.length === 0) {
+        document.getElementById("alerts").innerHTML = "No alerts yet.";
+        return;
+      }
+      document.getElementById("alerts").innerHTML = data.map(a =>
+        `<p><b>${a.type}</b>: ${a.notes} <br><small>${new Date(a.created_at).toLocaleString()}</small></p>`
+      ).join("");
+    }
 
-function renderAlerts(alerts, center, radiusMiles, filterType){
-  clearMarkers();
-  feedEl.innerHTML = "";
-  const filtered = alerts
-    .map(a => ({...a, distance: haversineMiles(center, {lat:a.lat, lng:a.lng}) }))
-    .filter(a => a.distance <= radiusMiles)
-    .filter(a => filterType==="All" ? true : a.type===filterType)
-    .sort((a,b)=> b.likes - a.likes);
+    // --- Post a new alert ---
+    async function postAlert() {
+      const type = document.getElementById("alertType").value;
+      const notes = document.getElementById("alertNotes").value;
+      const { error } = await _supabase.from("alerts").insert([{ type, notes }]);
+      if (error) {
+        alert("Error posting alert");
+        console.error(error);
+      } else {
+        alert("Alert posted!");
+        loadAlerts();
+      }
+    }
 
-  for (const a of filtered){
-    const m = L.marker([a.lat, a.lng]).addTo(map).bindPopup(`${a.type}: ${a.notes}`);
-    markers.push(m);
-    const item = document.createElement('div');
-    item.className = 'item';
-    item.innerHTML = `<div class="left">
-      <span class="badge type-${a.type}">${a.type}</span>
-      <div>${a.notes}</div>
-      <div class="pop">${a.distance.toFixed(1)} mi • ${new Date(a.created_at).toLocaleString()}</div>
-    </div>
-    <div class="row">
-      <button class="likeBtn" data-id="${a.id}">❤️ ${a.likes||0}</button>
-    </div>`;
-    feedEl.appendChild(item);
-  }
-  if (!filtered.length){
-    const empty = document.createElement('div');
-    empty.className = 'pop';
-    empty.style.padding = '8px';
-    empty.textContent = 'No alerts in range yet. Post one!';
-    feedEl.appendChild(empty);
-  }
-}
-
-function exportCSV(alerts, center, radiusMiles, filterType){
-  const filtered = alerts
-    .map(a => ({...a, distance: haversineMiles(center, {lat:a.lat, lng:a.lng}) }))
-    .filter(a => a.distance <= radiusMiles)
-    .filter(a => filterType==="All" ? true : a.type===filterType)
-    .sort((a,b)=> b.likes - a.likes);
-  const cols = ["id","created_at","type","notes","lat","lng","likes","distance"];
-  const rows = [cols.join(",")];
-  filtered.forEach(a=>{
-    const line = cols.map(k=> {
-      const v = a[k];
-      if (typeof v === 'string'){ return `"${v.replace(/"/g,'""')}"`; }
-      return v;
-    }).join(",");
-    rows.push(line);
-  });
-  const blob = new Blob([rows.join("\n")], {type: "text/csv;charset=utf-8;"});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url; a.download = "local_lens_export.csv"; a.click();
-  URL.revokeObjectURL(url);
-}
-
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
-
-async function loadAlerts(){
-  const { data, error } = await supabase
-    .from('alerts')
-    .select('id, created_at, type, notes, lat, lng, likes')
-    .order('created_at', { ascending:false })
-    .limit(300);
-  if (error){ log('Error loading alerts: '+error.message); return []; }
-  return data || [];
-}
-
-async function likeAlert(id){
-  const { error } = await supabase.rpc('increment_likes', { row_id: id });
-  if (error){ console.error(error); }
-}
-
-function cleanNotes(str){
-  let s = str.toLowerCase();
-  if (BAD_WORDS.some(w => s.includes(w))) return null;
-  return str;
-}
-
-function canPost(){
-  const last = Number(localStorage.getItem('ll_last_post_ts') || 0);
-  const now = Date.now();
-  return (now - last) >= 30000;
-}
-function markPosted(){ localStorage.setItem('ll_last_post_ts', String(Date.now())); }
-
-async function postAlert(center){
-  if (!canPost()){ alert('Please wait ~30 seconds between posts.'); return; }
-  const type = document.getElementById('type').value;
-  const raw = document.getElementById('notes').value.trim();
-  const notes = cleanNotes(raw);
-  if (!raw){ alert('Please add a short note.'); return; }
-  if (!notes){ alert('Please avoid profanity in notes.'); return; }
-  const payload = { type, notes, lat:center.lat, lng:center.lng, likes:0 };
-  const { error } = await supabase.from('alerts').insert(payload);
-  if (error){ alert('Error: '+error.message); return; }
-  document.getElementById('notes').value = '';
-  markPosted();
-  log('Posted! Reloading…');
-  await refresh();
-}
-
-supabase
-  .channel('alerts-live')
-  .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'alerts' }, (payload)=>{
-    cacheAlerts.unshift(payload.new);
-    refresh();
-  })
-  .subscribe();
-
-feedEl.addEventListener('click', async (e)=>{
-  const btn = e.target.closest('.likeBtn');
-  if (!btn) return;
-  const id = btn.getAttribute('data-id');
-  await likeAlert(id);
-  await refresh();
-});
-
-document.getElementById('post').addEventListener('click', ()=>{
-  const c = map.getCenter();
-  postAlert({ lat:c.lat, lng:c.lng });
-});
-
-let activeType = "All";
-document.querySelectorAll('.pill').forEach(el => {
-  el.addEventListener('click', ()=>{
-    document.querySelectorAll('.pill').forEach(p => p.classList.remove('active'));
-    el.classList.add('active'); activeType = el.dataset.type;
-    refresh();
-  });
-});
-
-setInterval(()=>{ document.getElementById('clock').textContent = new Date().toLocaleString(); }, 1000);
-
-const fallback = { lat:39.2904, lng:-76.6122 };
-let started=false;
-function startAt(lat,lng, from){
-  if (started) return;
-  started=true;
-  initMap(lat,lng);
-  log(from==='gps' ? 'GPS granted — centered on you.' : 'Using Baltimore fallback. You can still post from map center.');
-  refresh();
-}
-
-async function refresh(){
-  const alerts = cacheAlerts.length ? cacheAlerts : (cacheAlerts = await loadAlerts());
-  const c = map.getCenter(); const center = { lat:c.lat, lng:c.lng };
-  renderAlerts(alerts, center, Number(radiusEl.value), activeType);
-}
-
-if (navigator.geolocation){
-  navigator.geolocation.getCurrentPosition(
-    (pos)=> startAt(pos.coords.latitude, pos.coords.longitude, 'gps'),
-    (err)=> startAt(fallback.lat, fallback.lng, 'fallback'),
-    { enableHighAccuracy:true, timeout:2500, maximumAge:0 }
-  );
-} else {
-  startAt(fallback.lat, fallback.lng, 'fallback');
-}
-
-exportBtn.addEventListener('click', ()=>{
-  const c = map.getCenter(); const center = { lat:c.lat, lng:c.lng };
-  exportCSV(cacheAlerts, center, Number(radiusEl.value), activeType);
-});
-</script>
+    // Load alerts on start
+    loadAlerts();
+  </script>
 </body>
 </html>
